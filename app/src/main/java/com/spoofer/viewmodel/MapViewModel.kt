@@ -115,14 +115,10 @@ class MapViewModel
                     val latLng = LatLng(location.latitude, location.longitude)
                     _cameraPosition.value = latLng
                     _originLatLng.value = latLng
-                    if (_targetLatLng.value == null) {
-                        _targetLatLng.value = latLng
-                    }
                 } else {
                     val default = LatLng(DEFAULT_LAT, DEFAULT_LNG)
                     _cameraPosition.value = default
                     _originLatLng.value = default
-                    _targetLatLng.value = default
                 }
             }
         }

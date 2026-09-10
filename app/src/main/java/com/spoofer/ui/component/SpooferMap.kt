@@ -1,5 +1,9 @@
 package com.spoofer.ui.component
 
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -18,6 +22,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import org.maplibre.android.annotations.Icon
+import org.maplibre.android.annotations.IconFactory
 import org.maplibre.android.annotations.MarkerOptions
 import org.maplibre.android.annotations.PolylineOptions
 import org.maplibre.android.camera.CameraUpdateFactory
@@ -48,6 +54,8 @@ fun SpooferMap(
     val currentOnOriginClick by rememberUpdatedState(onOriginClick)
     val currentOnDestinationClick by rememberUpdatedState(onDestinationClick)
     val mapView = remember { MapView(context) }
+    val originMarkerIcon = remember(context) { circularMarkerIcon(context, android.graphics.Color.rgb(33, 117, 243)) }
+    val otherMarkerIcon = remember(context) { circularMarkerIcon(context, android.graphics.Color.rgb(220, 48, 48)) }
     var map by remember { mutableStateOf<MapLibreMap?>(null) }
     var styleLoaded by remember { mutableStateOf(false) }
 
@@ -134,9 +142,30 @@ fun SpooferMap(
         if (!styleLoaded) return@LaunchedEffect
 
         mapLibreMap.clear()
-        origin?.let { mapLibreMap.addMarker(MarkerOptions().position(it).title("Origin")) }
-        destination?.let { mapLibreMap.addMarker(MarkerOptions().position(it).title("Destination")) }
-        spoofedLocation?.let { mapLibreMap.addMarker(MarkerOptions().position(it).title("Spoofed location")) }
+        origin?.let {
+            mapLibreMap.addMarker(
+                MarkerOptions()
+                    .position(it)
+                    .title("Origin")
+                    .icon(originMarkerIcon),
+            )
+        }
+        destination?.let {
+            mapLibreMap.addMarker(
+                MarkerOptions()
+                    .position(it)
+                    .title("Destination")
+                    .icon(otherMarkerIcon),
+            )
+        }
+        spoofedLocation?.let {
+            mapLibreMap.addMarker(
+                MarkerOptions()
+                    .position(it)
+                    .title("Spoofed location")
+                    .icon(otherMarkerIcon),
+            )
+        }
         if (route.isNotEmpty()) {
             mapLibreMap.addPolyline(
                 PolylineOptions()
@@ -152,4 +181,28 @@ fun SpooferMap(
         if (!styleLoaded) return@LaunchedEffect
         map?.animateCamera(CameraUpdateFactory.newLatLngZoom(target, 16.0))
     }
+}
+
+private fun circularMarkerIcon(
+    context: Context,
+    color: Int,
+): Icon {
+    val density = context.resources.displayMetrics.density
+    val size = (24 * density).toInt()
+    val strokeWidth = 2 * density
+    val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    val center = size / 2f
+    val radius = center - strokeWidth
+
+    paint.style = Paint.Style.FILL
+    paint.color = color
+    canvas.drawCircle(center, center, radius, paint)
+    paint.style = Paint.Style.STROKE
+    paint.strokeWidth = strokeWidth
+    paint.color = android.graphics.Color.WHITE
+    canvas.drawCircle(center, center, radius, paint)
+
+    return IconFactory.getInstance(context).fromBitmap(bitmap)
 }

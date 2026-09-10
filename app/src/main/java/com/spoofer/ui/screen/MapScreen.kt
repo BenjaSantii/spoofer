@@ -295,14 +295,12 @@ fun MapScreen(
                 modifier = Modifier.fillMaxSize(),
                 origin =
                     when (selectedMode) {
-                        SpoofMode.DIRECTIONS -> if (isSpoofing) null else originLatLng
-                        SpoofMode.JOYSTICK -> if (isSpoofing) null else originLatLng
-                        SpoofMode.STATIC -> null
+                        SpoofMode.DIRECTIONS, SpoofMode.JOYSTICK -> originLatLng
+                        SpoofMode.STATIC -> cameraPosition
                     },
                 destination =
                     when (selectedMode) {
-                        SpoofMode.DIRECTIONS -> targetLatLng
-                        SpoofMode.STATIC -> if (isSpoofing) null else targetLatLng
+                        SpoofMode.DIRECTIONS, SpoofMode.STATIC -> targetLatLng
                         SpoofMode.JOYSTICK -> null
                     },
                 route = routePreview,
