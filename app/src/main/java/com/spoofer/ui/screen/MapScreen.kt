@@ -4,6 +4,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -16,8 +17,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AltRoute
+import androidx.compose.material.icons.filled.Gamepad
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MyLocation
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BottomSheetScaffold
@@ -38,6 +41,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -56,6 +60,7 @@ import com.spoofer.usecase.RoutePacing
 import com.spoofer.viewmodel.FavoritesViewModel
 import com.spoofer.viewmodel.MapViewModel
 import com.spoofer.viewmodel.SpoofViewModel
+import kotlinx.coroutines.launch
 import org.maplibre.android.geometry.LatLng
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -95,6 +100,7 @@ fun MapScreen(
 
     val haptic = LocalHapticFeedback.current
     val scaffoldState = rememberBottomSheetScaffoldState()
+    val scope = rememberCoroutineScope()
 
     var showFavoritesSheet by remember { mutableStateOf(false) }
     var showSaveDialog by remember { mutableStateOf(false) }
@@ -113,6 +119,21 @@ fun MapScreen(
 
     val isJoystickActive = isSpoofing && spoofMode == SpoofMode.JOYSTICK
     val isJoystickPreview = !isSpoofing && spoofMode == SpoofMode.JOYSTICK
+    val primaryActionEnabled =
+        isSpoofing ||
+            when (selectedMode) {
+                SpoofMode.STATIC -> targetLatLng != null
+                SpoofMode.DIRECTIONS ->
+                    originLatLng != null &&
+                        targetLatLng != null &&
+                        routeInfo != null &&
+                        when (speedMode) {
+                            com.spoofer.model.SpeedMode.MANUAL -> speedKmh > 0
+                            com.spoofer.model.SpeedMode.CURRENT -> currentSpeedKmh > 0
+                            com.spoofer.model.SpeedMode.DURATION -> durationMinutes > 0
+                        }
+                SpoofMode.JOYSTICK -> originLatLng != null
+            }
 
     val onStartStop: () -> Unit = {
         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -215,16 +236,21 @@ fun MapScreen(
 
     BottomSheetScaffold(
         scaffoldState = scaffoldState,
-        sheetPeekHeight = 144.dp,
+        sheetPeekHeight = 64.dp,
         sheetShape = MaterialTheme.shapes.extraLarge,
         sheetContainerColor = MaterialTheme.colorScheme.surface,
         containerColor = MaterialTheme.colorScheme.background,
         sheetContent = {
             BottomSheetContent(
                 selectedMode = selectedMode,
-                onModeSelected = { mapViewModel.setMode(it) },
                 targetLatLng = targetLatLng,
                 isSpoofing = isSpoofing,
+                primaryActionEnabled = primaryActionEnabled,
+                onPrimaryAction = {
+                    onStartStop()
+                    scope.launch { scaffoldState.bottomSheetState.partialExpand() }
+                },
+                onShowMap = { scope.launch { scaffoldState.bottomSheetState.partialExpand() } },
                 onSaveFavorite = { showSaveDialog = true },
                 originText = originText, destText = destText,
                 onOriginTextChange = { originText = it },
@@ -233,7 +259,17 @@ fun MapScreen(
                     mapViewModel.setOrigin(latLng)
                     routePointSelection = RoutePointSelection.DESTINATION
                 },
-                onSwap = { mapViewModel.swapOriginAndDestination() },
+                onUseCurrentLocation = {
+                    originText = "My Location"
+                    mapViewModel.loadInitialLocation()
+                    routePointSelection = RoutePointSelection.DESTINATION
+                },
+                onSwap = {
+                    mapViewModel.swapOriginAndDestination()
+                    val previousOriginText = originText
+                    originText = destText
+                    destText = previousOriginText
+                },
                 onDestSelected = { latLng ->
                     mapViewModel.setTarget(latLng)
                 },
@@ -257,10 +293,20 @@ fun MapScreen(
         Box(modifier = Modifier.fillMaxSize()) {
             SpooferMap(
                 modifier = Modifier.fillMaxSize(),
-                origin = originLatLng,
-                destination = targetLatLng,
+                origin =
+                    when (selectedMode) {
+                        SpoofMode.DIRECTIONS -> if (isSpoofing) null else originLatLng
+                        SpoofMode.JOYSTICK -> if (isSpoofing) null else originLatLng
+                        SpoofMode.STATIC -> null
+                    },
+                destination =
+                    when (selectedMode) {
+                        SpoofMode.DIRECTIONS -> targetLatLng
+                        SpoofMode.STATIC -> if (isSpoofing) null else targetLatLng
+                        SpoofMode.JOYSTICK -> null
+                    },
                 route = routePreview,
-                spoofedLocation = currentSpoofedLocation,
+                spoofedLocation = if (isSpoofing) currentSpoofedLocation else null,
                 cameraTarget = mapCameraTarget,
                 cameraRequestId = mapCameraRequestId,
                 routeColor = MaterialTheme.colorScheme.primary,
@@ -270,10 +316,12 @@ fun MapScreen(
                         when (routePointSelection) {
                             RoutePointSelection.ORIGIN -> {
                                 mapViewModel.setOrigin(latLng)
+                                originText = "%.5f, %.5f".format(latLng.latitude, latLng.longitude)
                                 routePointSelection = RoutePointSelection.DESTINATION
                             }
                             RoutePointSelection.DESTINATION -> {
                                 mapViewModel.setTarget(latLng)
+                                destText = "%.5f, %.5f".format(latLng.latitude, latLng.longitude)
                             }
                         }
                     } else {
@@ -317,7 +365,47 @@ fun MapScreen(
                 isActive = isJoystickActive,
                 isPreview = isJoystickPreview,
                 onInput = { spoofViewModel.updateJoystick(it.angle, it.magnitude, joySpeedKmh / 3.6f) },
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomStart)
+                        .navigationBarsPadding()
+                        .padding(start = 20.dp, bottom = 120.dp),
             )
+
+            if (!isSpoofing) {
+                Column(
+                    modifier =
+                        Modifier
+                            .align(Alignment.CenterEnd)
+                            .padding(end = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    ModeButton(
+                        selected = selectedMode == SpoofMode.STATIC,
+                        icon = { Icon(Icons.Default.LocationOn, "Fixed location") },
+                        onClick = {
+                            mapViewModel.setMode(SpoofMode.STATIC)
+                            scope.launch { scaffoldState.bottomSheetState.expand() }
+                        },
+                    )
+                    ModeButton(
+                        selected = selectedMode == SpoofMode.DIRECTIONS,
+                        icon = { Icon(Icons.Default.AltRoute, "Route") },
+                        onClick = {
+                            mapViewModel.setMode(SpoofMode.DIRECTIONS)
+                            scope.launch { scaffoldState.bottomSheetState.expand() }
+                        },
+                    )
+                    ModeButton(
+                        selected = selectedMode == SpoofMode.JOYSTICK,
+                        icon = { Icon(Icons.Default.Gamepad, "Joystick") },
+                        onClick = {
+                            mapViewModel.setMode(SpoofMode.JOYSTICK)
+                            scope.launch { scaffoldState.bottomSheetState.expand() }
+                        },
+                    )
+                }
+            }
 
             val fabInteraction = remember { MutableInteractionSource() }
             val fabPressed by fabInteraction.collectIsPressedAsState()
@@ -336,10 +424,8 @@ fun MapScreen(
                 modifier =
                     Modifier
                         .align(Alignment.BottomEnd)
-                        // Bug 10 fix: use navigationBarsPadding() so the FAB clears the
-                        // gesture navigation bar on edge-to-edge devices.
                         .navigationBarsPadding()
-                        .padding(end = 16.dp, bottom = 96.dp),
+                        .padding(end = 16.dp, bottom = 88.dp),
                 shape = androidx.compose.foundation.shape.CircleShape,
                 containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                 contentColor = MaterialTheme.colorScheme.primary,
@@ -351,46 +437,33 @@ fun MapScreen(
                 Icon(Icons.Default.MyLocation, contentDescription = "My Location", modifier = Modifier.size(24.dp))
             }
 
-            ExtendedFloatingActionButton(
-                onClick = onStartStop,
-                modifier =
-                    Modifier
-                        .align(Alignment.BottomCenter)
-                        // Bug 10 fix: use navigationBarsPadding() instead of hardcoded
-                        // 80dp so the FAB sits above the gesture/nav bar on all devices.
-                        .navigationBarsPadding()
-                        .padding(bottom = 80.dp)
-                        .scale(fabScale),
-                interactionSource = fabInteraction,
-                shape = androidx.compose.foundation.shape.CircleShape,
-                containerColor =
-                    if (isSpoofing) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        MaterialTheme.colorScheme.primary
-                    },
-                contentColor =
-                    if (isSpoofing) {
-                        MaterialTheme.colorScheme.onError
-                    } else {
-                        MaterialTheme.colorScheme.onPrimary
-                    },
-                elevation =
-                    FloatingActionButtonDefaults.elevation(
-                        defaultElevation = 4.dp,
-                        pressedElevation = 8.dp,
-                    ),
-            ) {
-                Icon(
-                    if (isSpoofing) Icons.Default.Stop else Icons.Default.PlayArrow,
-                    contentDescription = if (isSpoofing) "Stop" else "Start",
-                    modifier = Modifier.size(24.dp),
-                )
-                Spacer(Modifier.width(12.dp))
-                Text(
-                    text = if (isSpoofing) "Stop spoofing" else "Start spoofing",
-                    style = MaterialTheme.typography.labelLarge,
-                )
+            if (isSpoofing) {
+                ExtendedFloatingActionButton(
+                    onClick = onStartStop,
+                    modifier =
+                        Modifier
+                            .align(Alignment.BottomCenter)
+                            .navigationBarsPadding()
+                            .padding(bottom = 88.dp)
+                            .scale(fabScale),
+                    interactionSource = fabInteraction,
+                    shape = androidx.compose.foundation.shape.CircleShape,
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError,
+                    elevation =
+                        FloatingActionButtonDefaults.elevation(
+                            defaultElevation = 4.dp,
+                            pressedElevation = 8.dp,
+                        ),
+                ) {
+                    Icon(
+                        Icons.Default.Stop,
+                        contentDescription = "Stop",
+                        modifier = Modifier.size(24.dp),
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Text("Stop spoofing", style = MaterialTheme.typography.labelLarge)
+                }
             }
         }
     }
@@ -449,6 +522,31 @@ fun MapScreen(
     }
 
     if (showSetupDialog) MockLocationSetupDialog(onDismiss = { spoofViewModel.dismissSetupDialog() })
+}
+
+@Composable
+private fun ModeButton(
+    selected: Boolean,
+    icon: @Composable () -> Unit,
+    onClick: () -> Unit,
+) {
+    SmallFloatingActionButton(
+        onClick = onClick,
+        containerColor =
+            if (selected) {
+                MaterialTheme.colorScheme.primaryContainer
+            } else {
+                MaterialTheme.colorScheme.surfaceContainerHigh
+            },
+        contentColor =
+            if (selected) {
+                MaterialTheme.colorScheme.onPrimaryContainer
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            },
+        shape = androidx.compose.foundation.shape.CircleShape,
+        content = icon,
+    )
 }
 
 enum class RoutePointSelection {

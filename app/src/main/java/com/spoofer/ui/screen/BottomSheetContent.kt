@@ -22,26 +22,28 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DirectionsWalk
-import androidx.compose.material.icons.filled.Gamepad
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -60,15 +62,18 @@ import kotlin.math.roundToInt
 @Composable
 fun BottomSheetContent(
     selectedMode: SpoofMode,
-    onModeSelected: (SpoofMode) -> Unit,
     targetLatLng: LatLng?,
     isSpoofing: Boolean,
+    onPrimaryAction: () -> Unit,
+    primaryActionEnabled: Boolean,
+    onShowMap: () -> Unit,
     onSaveFavorite: () -> Unit = {},
     originText: String = "",
     destText: String = "",
     onOriginTextChange: (String) -> Unit = {},
     onDestTextChange: (String) -> Unit = {},
     onOriginSelected: (LatLng) -> Unit = {},
+    onUseCurrentLocation: () -> Unit = {},
     onSwap: () -> Unit = {},
     speedKmh: Float = 15f,
     onSpeedChange: (Float) -> Unit = {},
@@ -97,7 +102,8 @@ fun BottomSheetContent(
             Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
-                .padding(top = 8.dp),
+                .padding(top = 8.dp)
+                .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         // Drag Handle
@@ -109,27 +115,20 @@ fun BottomSheetContent(
                     .clip(androidx.compose.foundation.shape.CircleShape)
                     .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)),
         )
-        Spacer(Modifier.height(16.dp))
-
-        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-            SegmentedButton(
-                selected = selectedMode == SpoofMode.STATIC,
-                onClick = { onModeSelected(SpoofMode.STATIC) },
-                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3),
-                icon = { Icon(Icons.Default.LocationOn, null, Modifier.size(SegmentedButtonDefaults.IconSize)) },
-            ) { Text("Static", style = MaterialTheme.typography.labelMedium) }
-            SegmentedButton(
-                selected = selectedMode == SpoofMode.DIRECTIONS,
-                onClick = { onModeSelected(SpoofMode.DIRECTIONS) },
-                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3),
-                icon = { Icon(Icons.Default.DirectionsWalk, null, Modifier.size(SegmentedButtonDefaults.IconSize)) },
-            ) { Text("Directions", style = MaterialTheme.typography.labelMedium) }
-            SegmentedButton(
-                selected = selectedMode == SpoofMode.JOYSTICK,
-                onClick = { onModeSelected(SpoofMode.JOYSTICK) },
-                shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3),
-                icon = { Icon(Icons.Default.Gamepad, null, Modifier.size(SegmentedButtonDefaults.IconSize)) },
-            ) { Text("Joystick", style = MaterialTheme.typography.labelMedium) }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                when (selectedMode) {
+                    SpoofMode.STATIC -> "Fixed location"
+                    SpoofMode.DIRECTIONS -> "Route"
+                    SpoofMode.JOYSTICK -> "Joystick"
+                },
+                style = MaterialTheme.typography.titleMedium,
+            )
+            TextButton(onClick = onShowMap) { Text("Show map") }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -153,6 +152,7 @@ fun BottomSheetContent(
                         onOriginTextChange = onOriginTextChange,
                         onDestTextChange = onDestTextChange,
                         onOriginSelected = onOriginSelected,
+                        onUseCurrentLocation = onUseCurrentLocation,
                         onDestSelected = onDestSelected,
                         onSearchPlace = onSearchPlace,
                         onSwap = onSwap,
@@ -184,6 +184,29 @@ fun BottomSheetContent(
             }
         }
 
+        Spacer(modifier = Modifier.height(16.dp))
+        Button(
+            onClick = onPrimaryAction,
+            enabled = primaryActionEnabled,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Icon(
+                if (isSpoofing) Icons.Default.Stop else Icons.Default.PlayArrow,
+                contentDescription = null,
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                if (isSpoofing) {
+                    "Stop spoofing"
+                } else {
+                    when (selectedMode) {
+                        SpoofMode.STATIC -> "Set location"
+                        SpoofMode.DIRECTIONS -> "Start route"
+                        SpoofMode.JOYSTICK -> "Start joystick"
+                    }
+                },
+            )
+        }
         Spacer(modifier = Modifier.height(16.dp))
         Spacer(modifier = Modifier.navigationBarsPadding())
         Spacer(modifier = Modifier.height(12.dp))
@@ -272,6 +295,7 @@ private fun DirectionsModePanel(
     onOriginTextChange: (String) -> Unit,
     onDestTextChange: (String) -> Unit,
     onOriginSelected: (LatLng) -> Unit,
+    onUseCurrentLocation: () -> Unit,
     onDestSelected: (LatLng) -> Unit,
     onSearchPlace: suspend (String) -> List<com.spoofer.data.PlaceSuggestion>,
     onSwap: () -> Unit,
@@ -317,6 +341,19 @@ private fun DirectionsModePanel(
                 },
             )
         }
+
+        AssistChip(
+            onClick = onUseCurrentLocation,
+            label = { Text("Use my location as start") },
+            leadingIcon = {
+                Icon(
+                    Icons.Default.MyLocation,
+                    null,
+                    Modifier.size(AssistChipDefaults.IconSize),
+                )
+            },
+            modifier = Modifier.align(Alignment.Start),
+        )
 
         Spacer(Modifier.height(12.dp))
 
@@ -562,6 +599,12 @@ private fun DirectionsModePanel(
                     )
                 }
             }
+            Text(
+                "Route ready. Tap Start route on the map.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(top = 8.dp),
+            )
         }
 
         if (isSpoofing && remainingDistance != null && routeInfo != null) {
@@ -619,7 +662,11 @@ private fun JoystickPanel(
 ) {
     Column(Modifier.fillMaxWidth()) {
         Text(
-            "Drag the joystick on the map to move.",
+            if (isSpoofing) {
+                "Drag the joystick on the map to move. Release it to stop."
+            } else {
+                "Tap Start joystick, then drag the control on the map to move."
+            },
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

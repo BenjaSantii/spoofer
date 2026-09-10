@@ -5,7 +5,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
@@ -63,14 +62,13 @@ fun JoystickOverlay(
     val thumbHighlightColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = if (isActive) 0.2f else 0.05f)
 
     Box(
-        modifier = modifier.fillMaxSize(),
-        contentAlignment = Alignment.BottomCenter,
+        modifier = modifier.size(totalSizeDp),
+        contentAlignment = Alignment.Center,
     ) {
         Surface(
             modifier =
                 Modifier
-                    .offset(y = (-80).dp)
-                    .size(totalSizeDp),
+                    .fillMaxSize(),
             shape = CircleShape,
             color = surfaceColor,
             border = BorderStroke(if (isActive) 1.dp else 0.5.dp, crosshairColor),

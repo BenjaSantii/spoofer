@@ -13,6 +13,7 @@ import android.util.Log
 import com.spoofer.data.repository.HistoryRepository
 import com.spoofer.location.MockLocationProvider
 import com.spoofer.model.SpoofMode
+import com.spoofer.usecase.JoystickMotion
 import com.spoofer.usecase.RoutePacing
 import com.spoofer.usecase.SpeedSimulationUseCase
 import com.spoofer.usecase.StaticSpoofUseCase
@@ -163,17 +164,16 @@ class MockLocationService : Service() {
                             _currentLocation.value = jittered
                         }
                         SpoofMode.JOYSTICK -> {
-                            val radians = Math.toRadians(joyAngle.toDouble())
                             val joyMetersPerTick = (joySpeed * (TICK_INTERVAL_MS / 1000f)).toDouble()
-                            val deltaLat = joyMagnitude * joyMetersPerTick * Math.cos(radians) * METERS_PER_DEGREE_LAT
-                            val deltaLng =
-                                joyMagnitude * joyMetersPerTick * Math.sin(radians) *
-                                    Math.cos(
-                                        Math.toRadians(staticLat),
-                                    ) * METERS_PER_DEGREE_LAT
-                            staticLat += deltaLat
-                            staticLng += deltaLng
                             val distanceThisTick = joyMagnitude * joyMetersPerTick
+                            val nextLocation =
+                                JoystickMotion.move(
+                                    origin = LatLng(staticLat, staticLng),
+                                    bearingDegrees = joyAngle,
+                                    distanceMeters = distanceThisTick,
+                                )
+                            staticLat = nextLocation.latitude
+                            staticLng = nextLocation.longitude
                             _totalDistanceTraveled.value += distanceThisTick
                             _currentHeading.value = joyAngle
                             mockLocationProvider.setMockLocation(
@@ -369,7 +369,6 @@ class MockLocationService : Service() {
         private const val CHANNEL_ID = "spoofing_channel"
         private const val NOTIFICATION_ID = 1001
         private const val TICK_INTERVAL_MS = 200L
-        private const val METERS_PER_DEGREE_LAT = 1.0 / 111_320.0
 
         const val ACTION_SET_STATIC = "com.spoofer.action.SET_STATIC"
         const val ACTION_START_JOYSTICK = "com.spoofer.action.START_JOYSTICK"

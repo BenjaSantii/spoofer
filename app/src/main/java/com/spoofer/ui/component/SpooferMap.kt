@@ -43,7 +43,7 @@ fun SpooferMap(
 ) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    val mapControlsBottomMargin = with(LocalDensity.current) { 168.dp.roundToPx() }
+    val mapControlsBottomMargin = with(LocalDensity.current) { 80.dp.roundToPx() }
     val currentOnMapClick by rememberUpdatedState(onMapClick)
     val currentOnOriginClick by rememberUpdatedState(onOriginClick)
     val currentOnDestinationClick by rememberUpdatedState(onDestinationClick)
