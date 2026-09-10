@@ -50,6 +50,7 @@ fun MockLocationSetupDialog(onDismiss: () -> Unit) {
         },
         confirmButton = {
             TextButton(onClick = {
+                onDismiss()
                 val intent = Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)
                 context.startActivity(intent)
             }) {

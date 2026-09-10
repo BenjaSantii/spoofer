@@ -148,6 +148,10 @@ The app will not work unless you grant it Mock Location authority at the OS leve
 6. Tap **Select mock location app** and choose **Spoofer** from the list.
 7. *(Optional but Highly Recommended)*: Go to Settings -> Location -> Location Services and turn **OFF "Google Location Accuracy"** (Wi-Fi/Bluetooth scanning). This severely cripples Rubber-Banding.
 
+Spoofer checks Android's mock-location app operation whenever it starts. This works from Android
+8 (`minSdk 26`) onward. **Skip** dismisses the setup prompt only for the current app session, so
+the warning returns after a restart if permission is still missing.
+
 ---
 
 ## 🐛 Known Bugs & Limitations

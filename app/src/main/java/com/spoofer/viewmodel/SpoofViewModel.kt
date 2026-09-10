@@ -2,22 +2,17 @@ package com.spoofer.viewmodel
 
 import android.app.Application
 import android.content.Intent
-import android.provider.Settings
-import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.booleanPreferencesKey
-import androidx.datastore.preferences.core.edit
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.android.gms.maps.model.LatLng
 import com.spoofer.data.DirectionsRepository
 import com.spoofer.data.RouteInfo
+import com.spoofer.location.MockLocationPermissionChecker
 import com.spoofer.service.MockLocationService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -26,8 +21,8 @@ class SpoofViewModel
     @Inject
     constructor(
         private val application: Application,
-        private val dataStore: DataStore<Preferences>,
         private val directionsRepo: DirectionsRepository,
+        private val mockLocationPermissionChecker: MockLocationPermissionChecker,
     ) : ViewModel() {
         private val _showSetupDialog = MutableStateFlow(false)
         val showSetupDialog: StateFlow<Boolean> = _showSetupDialog.asStateFlow()
@@ -110,24 +105,11 @@ class SpoofViewModel
         }
 
         fun checkMockLocationProvider() {
-            viewModelScope.launch {
-                val dismissed = dataStore.data.first()[KEY_SETUP_DISMISSED] ?: false
-                if (dismissed) return@launch
-                val allowMock =
-                    try {
-                        Settings.Secure.getInt(application.contentResolver, "mock_location", 0)
-                    } catch (_: Exception) {
-                        0
-                    }
-                if (allowMock == 0) {
-                    _showSetupDialog.value = true
-                }
-            }
+            _showSetupDialog.value = !mockLocationPermissionChecker.isAllowed()
         }
 
         fun dismissSetupDialog() {
             _showSetupDialog.value = false
-            viewModelScope.launch { dataStore.edit { it[KEY_SETUP_DISMISSED] = true } }
         }
 
         fun startJoystick(
@@ -166,9 +148,5 @@ class SpoofViewModel
                     putExtra(MockLocationService.EXTRA_SPEED, speedMps)
                 }
             application.startService(intent)
-        }
-
-        companion object {
-            private val KEY_SETUP_DISMISSED = booleanPreferencesKey("setup_dismissed")
         }
     }
