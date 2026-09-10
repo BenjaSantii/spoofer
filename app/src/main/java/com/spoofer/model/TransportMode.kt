@@ -6,4 +6,4 @@ enum class TransportMode(val label: String, val osrmProfile: String, val default
     CAR("Driving", "driving", 60f),
 }
 
-enum class SpeedMode { MANUAL, CURRENT }
+enum class SpeedMode { MANUAL, DURATION, CURRENT }

@@ -39,12 +39,12 @@ class SpoofViewModel
         val routePreview: StateFlow<List<LatLng>> = _routePreview.asStateFlow()
 
         private val _isLoadingRoute = MutableStateFlow(false)
-    val isLoadingRoute: StateFlow<Boolean> = _isLoadingRoute.asStateFlow()
+        val isLoadingRoute: StateFlow<Boolean> = _isLoadingRoute.asStateFlow()
 
-    private val _routeError = MutableStateFlow<String?>(null)
-    val routeError: StateFlow<String?> = _routeError.asStateFlow()
+        private val _routeError = MutableStateFlow<String?>(null)
+        val routeError: StateFlow<String?> = _routeError.asStateFlow()
 
-    val remainingDistance: StateFlow<Double> = MockLocationService.remainingDistance
+        val remainingDistance: StateFlow<Double> = MockLocationService.remainingDistance
 
         fun startStaticSpoof(target: LatLng) {
             val intent =
@@ -60,6 +60,7 @@ class SpoofViewModel
             origin: LatLng,
             destination: LatLng,
             speedMps: Float,
+            durationSeconds: Long? = null,
         ) {
             val intent =
                 Intent(application, MockLocationService::class.java).apply {
@@ -69,6 +70,7 @@ class SpoofViewModel
                     putExtra(MockLocationService.EXTRA_DEST_LATITUDE, destination.latitude)
                     putExtra(MockLocationService.EXTRA_DEST_LONGITUDE, destination.longitude)
                     putExtra(MockLocationService.EXTRA_SPEED, speedMps)
+                    durationSeconds?.let { putExtra(MockLocationService.EXTRA_DURATION_SECONDS, it) }
                 }
             application.startForegroundService(intent)
         }

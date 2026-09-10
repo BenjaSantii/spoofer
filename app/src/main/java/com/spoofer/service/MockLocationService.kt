@@ -9,10 +9,12 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.util.Log
 import com.google.android.gms.maps.model.LatLng
 import com.spoofer.data.repository.HistoryRepository
 import com.spoofer.location.MockLocationProvider
 import com.spoofer.model.SpoofMode
+import com.spoofer.usecase.RoutePacing
 import com.spoofer.usecase.SpeedSimulationUseCase
 import com.spoofer.usecase.StaticSpoofUseCase
 import dagger.hilt.android.AndroidEntryPoint
@@ -51,6 +53,7 @@ class MockLocationService : Service() {
     private var joyMagnitude = 0f
     private var joySpeed = 0f
     private var speedMps = 0f
+    private var randomizeRouteSpeed = true
     private var destLat = 0.0
     private var destLng = 0.0
     private var historySessionId: Long = -1
@@ -99,15 +102,25 @@ class MockLocationService : Service() {
                 destLat = intent.getDoubleExtra(EXTRA_DEST_LATITUDE, 0.0)
                 destLng = intent.getDoubleExtra(EXTRA_DEST_LONGITUDE, 0.0)
                 speedMps = intent.getFloatExtra(EXTRA_SPEED, 4.17f)
-                // Bug 5 fix: initialize the route BEFORE starting the ticker so
-                // the first tick has valid polyline data and doesn't freeze/teleport.
+                val durationSeconds = intent.getLongExtra(EXTRA_DURATION_SECONDS, 0L)
+                randomizeRouteSpeed = durationSeconds <= 0
+                startForegroundService()
                 scope.launch(Dispatchers.IO) {
-                    speedSimulationUseCase.initialize(
-                        LatLng(staticLat, staticLng),
-                        LatLng(destLat, destLng),
-                    )
-                    _remainingDistance.value = speedSimulationUseCase.remainingDistance
-                    startSpoofing()
+                    runCatching {
+                        speedSimulationUseCase.initialize(
+                            LatLng(staticLat, staticLng),
+                            LatLng(destLat, destLng),
+                        )
+                    }.onSuccess { route ->
+                        if (durationSeconds > 0) {
+                            speedMps = RoutePacing.speedMetersPerSecond(route.distanceMeters.toDouble(), durationSeconds)
+                        }
+                        _remainingDistance.value = speedSimulationUseCase.remainingDistance
+                        startSpoofing()
+                    }.onFailure { error ->
+                        Log.e(TAG, "Unable to start route", error)
+                        stopSpoofing()
+                    }
                 }
                 return START_STICKY
             }
@@ -133,13 +146,7 @@ class MockLocationService : Service() {
 
         spoofLocationSource.enterSpoofMode()
 
-        val notification = buildNotification(staticLat, staticLng)
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
-        } else {
-            startForeground(NOTIFICATION_ID, notification)
-        }
+        startForegroundService()
 
         tickerJob?.cancel()
         tickerJob =
@@ -183,7 +190,12 @@ class MockLocationService : Service() {
                             _currentLocation.value = LatLng(staticLat, staticLng)
                         }
                         SpoofMode.DIRECTIONS -> {
-                            val speedVariation = speedMps * (1f + (kotlin.random.Random.nextFloat() - 0.5f) * 0.1f)
+                            val speedVariation =
+                                if (randomizeRouteSpeed) {
+                                    speedMps * (1f + (kotlin.random.Random.nextFloat() - 0.5f) * 0.1f)
+                                } else {
+                                    speedMps
+                                }
                             val metersPerTick = speedVariation * (TICK_INTERVAL_MS / 1000f)
                             val result = speedSimulationUseCase.tick(metersPerTick)
                             if (result != null) {
@@ -217,6 +229,15 @@ class MockLocationService : Service() {
                     delay(TICK_INTERVAL_MS)
                 }
             }
+    }
+
+    private fun startForegroundService() {
+        val notification = buildNotification(staticLat, staticLng)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
     }
 
     private fun stopSpoofing() {
@@ -352,6 +373,7 @@ class MockLocationService : Service() {
     }
 
     companion object {
+        private const val TAG = "MockLocationService"
         private const val CHANNEL_ID = "spoofing_channel"
         private const val NOTIFICATION_ID = 1001
         private const val TICK_INTERVAL_MS = 200L
@@ -368,6 +390,7 @@ class MockLocationService : Service() {
         const val EXTRA_DEST_LATITUDE = "dest_latitude"
         const val EXTRA_DEST_LONGITUDE = "dest_longitude"
         const val EXTRA_SPEED = "speed"
+        const val EXTRA_DURATION_SECONDS = "duration_seconds"
         const val EXTRA_ANGLE = "angle"
         const val EXTRA_MAGNITUDE = "magnitude"
 

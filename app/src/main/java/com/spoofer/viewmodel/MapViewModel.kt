@@ -53,6 +53,9 @@ class MapViewModel
         private val _speedMode = MutableStateFlow(SpeedMode.MANUAL)
         val speedMode: StateFlow<SpeedMode> = _speedMode.asStateFlow()
 
+        private val _durationMinutes = MutableStateFlow(15f)
+        val durationMinutes: StateFlow<Float> = _durationMinutes.asStateFlow()
+
         private val _joySpeedKmh = MutableStateFlow(5f)
         val joySpeedKmh: StateFlow<Float> = _joySpeedKmh.asStateFlow()
 
@@ -95,6 +98,10 @@ class MapViewModel
 
         fun setSpeedMode(mode: SpeedMode) {
             _speedMode.value = mode
+        }
+
+        fun setDurationMinutes(minutes: Float) {
+            _durationMinutes.value = minutes
         }
 
         fun setJoySpeedKmh(kmh: Float) {

@@ -217,6 +217,12 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.primary,
                 )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Fork maintained by @BenjaSantii",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
             }
 
             Spacer(Modifier.height(32.dp))

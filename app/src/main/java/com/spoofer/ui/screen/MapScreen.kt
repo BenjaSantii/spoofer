@@ -9,6 +9,8 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -20,8 +22,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.PlayArrow
@@ -73,6 +73,7 @@ import com.spoofer.ui.component.JoystickOverlay
 import com.spoofer.ui.component.LocationSearchBar
 import com.spoofer.ui.component.MockLocationSetupDialog
 import com.spoofer.ui.component.StatusChip
+import com.spoofer.usecase.RoutePacing
 import com.spoofer.viewmodel.FavoritesViewModel
 import com.spoofer.viewmodel.MapViewModel
 import com.spoofer.viewmodel.SpoofViewModel
@@ -96,6 +97,7 @@ fun MapScreen(
     val elapsedSeconds by mapViewModel.elapsedSeconds.collectAsState()
     val speedKmh by mapViewModel.speedKmh.collectAsState()
     val speedMode by mapViewModel.speedMode.collectAsState()
+    val durationMinutes by mapViewModel.durationMinutes.collectAsState()
     val currentSpeedKmh by mapViewModel.currentSpeedKmh.collectAsState()
     val transportMode by mapViewModel.transportMode.collectAsState()
     val joySpeedKmh by mapViewModel.joySpeedKmh.collectAsState()
@@ -120,6 +122,7 @@ fun MapScreen(
     var saveDialogName by remember { mutableStateOf("") }
     var originText by remember { mutableStateOf("My Location") }
     var destText by remember { mutableStateOf("") }
+    var routePointSelection by remember { mutableStateOf(RoutePointSelection.DESTINATION) }
     val favoritesSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     val cameraState = rememberCameraPositionState()
@@ -148,14 +151,37 @@ fun MapScreen(
             spoofViewModel.stopSpoofing()
         } else {
             when (selectedMode) {
-                SpoofMode.STATIC -> targetLatLng?.let {
-                    spoofViewModel.startStaticSpoof(it)
-                }
+                SpoofMode.STATIC ->
+                    targetLatLng?.let {
+                        spoofViewModel.startStaticSpoof(it)
+                    }
                 SpoofMode.DIRECTIONS -> {
                     val origin = originLatLng ?: cameraPosition
                     val dest = targetLatLng
-                    if (origin != null && dest != null) {
-                        spoofViewModel.startDirectionsSpoof(origin, dest, speedKmh / 3.6f)
+                    val routeSpeedMps =
+                        when (speedMode) {
+                            com.spoofer.model.SpeedMode.MANUAL -> speedKmh / 3.6f
+                            com.spoofer.model.SpeedMode.CURRENT -> currentSpeedKmh / 3.6f
+                            com.spoofer.model.SpeedMode.DURATION ->
+                                routeInfo?.takeIf { it.distanceMeters > 0 }?.let {
+                                    RoutePacing.speedMetersPerSecond(
+                                        distanceMeters = it.distanceMeters.toDouble(),
+                                        durationSeconds = (durationMinutes * 60).toLong(),
+                                    )
+                                }
+                        }
+                    if (origin != null && dest != null && routeSpeedMps != null && routeSpeedMps > 0) {
+                        spoofViewModel.startDirectionsSpoof(
+                            origin = origin,
+                            destination = dest,
+                            speedMps = routeSpeedMps,
+                            durationSeconds =
+                                if (speedMode == com.spoofer.model.SpeedMode.DURATION) {
+                                    (durationMinutes * 60).toLong()
+                                } else {
+                                    null
+                                },
+                        )
                     }
                 }
                 SpoofMode.JOYSTICK ->
@@ -229,7 +255,7 @@ fun MapScreen(
 
     BottomSheetScaffold(
         scaffoldState = scaffoldState,
-        sheetPeekHeight = 72.dp,
+        sheetPeekHeight = 144.dp,
         sheetShape = MaterialTheme.shapes.extraLarge,
         sheetContainerColor = MaterialTheme.colorScheme.surface,
         containerColor = MaterialTheme.colorScheme.background,
@@ -246,6 +272,7 @@ fun MapScreen(
                 onOriginSelected = { latLng ->
                     mapViewModel.setOrigin(latLng)
                     originMarkerState.position = latLng
+                    routePointSelection = RoutePointSelection.DESTINATION
                 },
                 onSwap = { mapViewModel.swapOriginAndDestination() },
                 onDestSelected = { latLng ->
@@ -255,7 +282,11 @@ fun MapScreen(
                 onSearchPlace = { query -> mapViewModel.searchPlaces(query) },
                 speedKmh = speedKmh, onSpeedChange = { mapViewModel.setSpeedKmh(it) },
                 speedMode = speedMode, onSpeedModeChange = { mapViewModel.setSpeedMode(it) },
+                durationMinutes = durationMinutes,
+                onDurationChange = { mapViewModel.setDurationMinutes(it) },
                 currentSpeedKmh = currentSpeedKmh,
+                routePointSelection = routePointSelection,
+                onRoutePointSelectionChange = { routePointSelection = it },
                 transportMode = transportMode, onTransportModeChange = { mapViewModel.setTransportMode(it) },
                 routeInfo = routeInfo, remainingDistance = remainingDistance,
                 isLoadingRoute = isLoadingRoute,
@@ -290,9 +321,18 @@ fun MapScreen(
                     ),
                 onMapClick = { latLng ->
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    if (selectedMode == SpoofMode.DIRECTIONS && targetLatLng != null) {
-                        mapViewModel.setOrigin(latLng)
-                        originMarkerState.position = latLng
+                    if (selectedMode == SpoofMode.DIRECTIONS) {
+                        when (routePointSelection) {
+                            RoutePointSelection.ORIGIN -> {
+                                mapViewModel.setOrigin(latLng)
+                                originMarkerState.position = latLng
+                                routePointSelection = RoutePointSelection.DESTINATION
+                            }
+                            RoutePointSelection.DESTINATION -> {
+                                mapViewModel.setTarget(latLng)
+                                targetMarkerState.position = latLng
+                            }
+                        }
                     } else {
                         mapViewModel.setTarget(latLng)
                         targetMarkerState.position = latLng
@@ -303,13 +343,22 @@ fun MapScreen(
                     Marker(
                         state = originMarkerState,
                         title = "Origin",
+                        onClick = {
+                            routePointSelection = RoutePointSelection.ORIGIN
+                            false
+                        },
+                        onInfoWindowClick = { routePointSelection = RoutePointSelection.ORIGIN },
                         icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN),
                     )
                 }
                 Marker(
                     state = targetMarkerState,
                     title = "Destination",
-                    draggable = true,
+                    onClick = {
+                        routePointSelection = RoutePointSelection.DESTINATION
+                        false
+                    },
+                    onInfoWindowClick = { routePointSelection = RoutePointSelection.DESTINATION },
                     icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED),
                 )
 
@@ -496,4 +545,9 @@ fun MapScreen(
     }
 
     if (showSetupDialog) MockLocationSetupDialog(onDismiss = { spoofViewModel.dismissSetupDialog() })
+}
+
+enum class RoutePointSelection {
+    ORIGIN,
+    DESTINATION,
 }

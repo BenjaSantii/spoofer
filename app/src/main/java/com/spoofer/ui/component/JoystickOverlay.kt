@@ -135,7 +135,7 @@ fun JoystickOverlay(
                                 }
                             } else {
                                 Modifier
-                            }
+                            },
                         ),
             ) {
                 Canvas(modifier = Modifier.fillMaxSize()) {

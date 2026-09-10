@@ -40,6 +40,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -54,6 +55,7 @@ import com.spoofer.model.TransportMode
 import com.spoofer.ui.component.LocationInputField
 import com.spoofer.ui.component.SpeedSlider
 import java.util.Locale
+import kotlin.math.roundToInt
 
 @Composable
 fun BottomSheetContent(
@@ -72,7 +74,11 @@ fun BottomSheetContent(
     onSpeedChange: (Float) -> Unit = {},
     speedMode: SpeedMode = SpeedMode.MANUAL,
     onSpeedModeChange: (SpeedMode) -> Unit = {},
+    durationMinutes: Float = 15f,
+    onDurationChange: (Float) -> Unit = {},
     currentSpeedKmh: Float = 0f,
+    routePointSelection: RoutePointSelection = RoutePointSelection.DESTINATION,
+    onRoutePointSelectionChange: (RoutePointSelection) -> Unit = {},
     transportMode: TransportMode = TransportMode.CAR,
     onTransportModeChange: (TransportMode) -> Unit = {},
     routeInfo: RouteInfo? = null,
@@ -154,7 +160,11 @@ fun BottomSheetContent(
                         onSpeedChange = onSpeedChange,
                         speedMode = speedMode,
                         onSpeedModeChange = onSpeedModeChange,
+                        durationMinutes = durationMinutes,
+                        onDurationChange = onDurationChange,
                         currentSpeedKmh = currentSpeedKmh,
+                        routePointSelection = routePointSelection,
+                        onRoutePointSelectionChange = onRoutePointSelectionChange,
                         transportMode = transportMode,
                         onTransportModeChange = onTransportModeChange,
                         routeInfo = routeInfo,
@@ -269,7 +279,11 @@ private fun DirectionsModePanel(
     onSpeedChange: (Float) -> Unit,
     speedMode: SpeedMode,
     onSpeedModeChange: (SpeedMode) -> Unit,
+    durationMinutes: Float,
+    onDurationChange: (Float) -> Unit,
     currentSpeedKmh: Float,
+    routePointSelection: RoutePointSelection,
+    onRoutePointSelectionChange: (RoutePointSelection) -> Unit,
     transportMode: TransportMode,
     onTransportModeChange: (TransportMode) -> Unit,
     routeInfo: RouteInfo?,
@@ -279,6 +293,33 @@ private fun DirectionsModePanel(
     isSpoofing: Boolean,
 ) {
     Column(Modifier.fillMaxWidth()) {
+        Text(
+            "Tap the map to place",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(8.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(
+                selected = routePointSelection == RoutePointSelection.ORIGIN,
+                onClick = { onRoutePointSelectionChange(RoutePointSelection.ORIGIN) },
+                label = { Text("Start") },
+                leadingIcon = {
+                    Icon(Icons.Default.LocationOn, null, tint = MaterialTheme.colorScheme.tertiary)
+                },
+            )
+            FilterChip(
+                selected = routePointSelection == RoutePointSelection.DESTINATION,
+                onClick = { onRoutePointSelectionChange(RoutePointSelection.DESTINATION) },
+                label = { Text("Destination") },
+                leadingIcon = {
+                    Icon(Icons.Default.LocationOn, null, tint = MaterialTheme.colorScheme.error)
+                },
+            )
+        }
+
+        Spacer(Modifier.height(12.dp))
+
         androidx.compose.material3.Card(
             Modifier.fillMaxWidth(),
             shape = MaterialTheme.shapes.medium,
@@ -394,12 +435,42 @@ private fun DirectionsModePanel(
                         selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
                     ),
             )
+            FilterChip(
+                selected = speedMode == SpeedMode.DURATION,
+                onClick = { onSpeedModeChange(SpeedMode.DURATION) },
+                label = { Text("Duration", style = MaterialTheme.typography.labelMedium) },
+                colors =
+                    FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    ),
+            )
         }
 
         Spacer(Modifier.height(12.dp))
 
         when (speedMode) {
             SpeedMode.MANUAL -> SpeedSlider(speedKmh, onSpeedChange)
+            SpeedMode.DURATION -> {
+                Text(
+                    "Complete route in ${durationMinutes.roundToInt()} minutes",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Slider(
+                    value = durationMinutes,
+                    onValueChange = onDurationChange,
+                    valueRange = 1f..180f,
+                    steps = 178,
+                )
+                routeInfo?.takeIf { it.distanceMeters > 0 }?.let { route ->
+                    val calculatedSpeed = route.distanceMeters / (durationMinutes * 60f) * 3.6f
+                    Text(
+                        "Calculated speed: ${String.format(Locale.US, "%.1f", calculatedSpeed)} km/h",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
             SpeedMode.CURRENT -> {
                 androidx.compose.material3.Card(
                     Modifier.fillMaxWidth(),
@@ -521,6 +592,8 @@ private fun DirectionsModePanel(
                 val etaSeconds =
                     if (speedMode == SpeedMode.CURRENT && currentSpeedKmh > 0) {
                         (remainingDistance / (currentSpeedKmh / 3.6)).toInt()
+                    } else if (speedMode == SpeedMode.DURATION && routeInfo.distanceMeters > 0) {
+                        (remainingDistance / routeInfo.distanceMeters * durationMinutes * 60).toInt()
                     } else if (speedKmh > 0) {
                         (remainingDistance / (speedKmh / 3.6)).toInt()
                     } else {

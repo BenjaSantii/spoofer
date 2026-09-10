@@ -35,6 +35,15 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".command.CommandActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:finishOnTaskLaunch="true"
+            android:noHistory="true"
+            android:permission="android.permission.DUMP"
+            android:theme="@android:style/Theme.NoDisplay" />
+
         <service
             android:name=".service.MockLocationService"
             android:foregroundServiceType="location"

@@ -12,7 +12,7 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.spoofer"
+        applicationId = "com.benjasanti.spoofer"
         minSdk = 26
         targetSdk = 35
         versionCode = 2
@@ -20,26 +20,42 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        val mapsApiKey = providers.gradleProperty("MAPS_API_KEY").orElse("").get()
+        val mapsApiKey =
+            providers.gradleProperty("MAPS_API_KEY")
+                .orElse(providers.environmentVariable("MAPS_API_KEY"))
+                .orElse("")
+                .get()
 
         resValue("string", "maps_api_key", mapsApiKey)
         buildConfigField("String", "MAPS_API_KEY", "\"$mapsApiKey\"")
     }
 
-    signingConfigs {
-        create("release") {
-            storeFile = file("spoofer-release.keystore")
-            storePassword = "spoofer123"
-            keyAlias = "spoofer"
-            keyPassword = "spoofer123"
+    val releaseStoreFile = providers.gradleProperty("SPOOFER_RELEASE_STORE_FILE").orNull
+    val releaseStorePassword = providers.gradleProperty("SPOOFER_RELEASE_STORE_PASSWORD").orNull
+    val releaseKeyAlias = providers.gradleProperty("SPOOFER_RELEASE_KEY_ALIAS").orNull
+    val releaseKeyPassword = providers.gradleProperty("SPOOFER_RELEASE_KEY_PASSWORD").orNull
+    val releaseSigningConfig =
+        if (
+            releaseStoreFile != null &&
+            releaseStorePassword != null &&
+            releaseKeyAlias != null &&
+            releaseKeyPassword != null
+        ) {
+            signingConfigs.create("release") {
+                storeFile = file(releaseStoreFile)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        } else {
+            null
         }
-    }
 
     buildTypes {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            signingConfig = signingConfigs.getByName("release")
+            signingConfig = releaseSigningConfig
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",

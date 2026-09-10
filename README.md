@@ -31,6 +31,7 @@ copyright notice and MIT license are preserved in [LICENSE](LICENSE).
 6. [Known Bugs & Limitations](#-known-bugs--limitations)
 7. [Contributing & Community Help](#-contributing--community-help)
 8. [License](#-license)
+9. [ADB command line](#-adb-command-line)
 
 ---
 
@@ -124,12 +125,17 @@ Since this app interfaces with system-level Developer Options, installation requ
    ```
 2. **Open in Android Studio:**
    Allow Gradle to sync the dependencies.
-3. **Compile the APK:**
+3. **Configure Google Maps:**
+   Supply an Android-restricted Google Maps API key without committing it:
+   ```bash
+   export MAPS_API_KEY=your_key
+   ```
+4. **Compile the APK:**
    Click the **Run** button, or build via terminal:
    ```bash
    ./gradlew assembleDebug
    ```
-4. **Install to Device:**
+5. **Install to Device:**
    Ensure your device is connected via ADB and install the generated APK.
 
 ### Enabling Mock Locations (Crucial Step)
@@ -170,3 +176,39 @@ Please read our [**CONTRIBUTING.md**](CONTRIBUTING.md) for full details on how y
 ## 📜 License
 
 This project is licensed under the **MIT License**. See the [LICENSE](LICENSE) file for complete details. You are free to modify, distribute, and use this code commercially and privately, provided proper attribution is given.
+
+---
+
+## ADB command line
+
+The fork can set a point or start and stop routes from a computer connected through USB or
+wireless ADB. The command activity is protected by Android's `DUMP` permission, which the ADB
+shell holds but regular third-party apps do not.
+
+```bash
+tools/spoofer set-location -33.4372 -70.6506
+
+tools/spoofer route \
+  -33.4372 -70.6506 \
+  -33.4020 -70.5780 \
+  --duration 15m
+
+tools/spoofer status
+tools/spoofer stop
+```
+
+Use `--speed-kmh 40` instead of `--duration 15m` to control a route by speed. If multiple
+devices are connected, set `ADB_SERIAL` to the desired device serial.
+
+### Release signing
+
+Release credentials are intentionally excluded from source control. Supply them through Gradle
+properties when creating a signed release:
+
+```bash
+ORG_GRADLE_PROJECT_SPOOFER_RELEASE_STORE_FILE=/absolute/path/to/release.keystore \
+ORG_GRADLE_PROJECT_SPOOFER_RELEASE_STORE_PASSWORD=... \
+ORG_GRADLE_PROJECT_SPOOFER_RELEASE_KEY_ALIAS=... \
+ORG_GRADLE_PROJECT_SPOOFER_RELEASE_KEY_PASSWORD=... \
+./gradlew assembleRelease
+```
