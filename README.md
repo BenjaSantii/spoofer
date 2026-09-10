@@ -16,6 +16,12 @@
 
 ---
 
+This repository is a fork of [r69shabh/spoofer](https://github.com/r69shabh/spoofer),
+originally created by [Rishabh Gusain](https://github.com/r69shabh). The original
+copyright notice and MIT license are preserved in [LICENSE](LICENSE).
+
+---
+
 ## 📖 Table of Contents
 1. [Project Overview](#-project-overview)
 2. [Deep Dive into Features](#-deep-dive-into-features)
