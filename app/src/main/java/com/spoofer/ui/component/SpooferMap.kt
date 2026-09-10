@@ -55,7 +55,6 @@ fun SpooferMap(
     val currentOnDestinationClick by rememberUpdatedState(onDestinationClick)
     val mapView = remember { MapView(context) }
     val originMarkerIcon = remember(context) { circularMarkerIcon(context, android.graphics.Color.rgb(33, 117, 243)) }
-    val otherMarkerIcon = remember(context) { circularMarkerIcon(context, android.graphics.Color.rgb(220, 48, 48)) }
     var map by remember { mutableStateOf<MapLibreMap?>(null) }
     var styleLoaded by remember { mutableStateOf(false) }
 
@@ -154,16 +153,14 @@ fun SpooferMap(
             mapLibreMap.addMarker(
                 MarkerOptions()
                     .position(it)
-                    .title("Destination")
-                    .icon(otherMarkerIcon),
+                    .title("Destination"),
             )
         }
         spoofedLocation?.let {
             mapLibreMap.addMarker(
                 MarkerOptions()
                     .position(it)
-                    .title("Spoofed location")
-                    .icon(otherMarkerIcon),
+                    .title("Spoofed location"),
             )
         }
         if (route.isNotEmpty()) {
