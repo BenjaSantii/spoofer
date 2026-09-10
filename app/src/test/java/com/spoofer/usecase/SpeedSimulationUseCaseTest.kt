@@ -1,6 +1,5 @@
 package com.spoofer.usecase
 
-import com.google.android.gms.maps.model.LatLng
 import com.spoofer.data.DirectionsRepository
 import com.spoofer.data.RouteInfo
 import io.mockk.coEvery
@@ -10,6 +9,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.maplibre.android.geometry.LatLng
 
 class SpeedSimulationUseCaseTest {
     private val repository = mockk<DirectionsRepository>()

@@ -2,7 +2,6 @@ package com.spoofer.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.google.android.gms.maps.model.LatLng
 import com.spoofer.data.db.SavedLocationEntity
 import com.spoofer.data.repository.FavoritesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -10,6 +9,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import org.maplibre.android.geometry.LatLng
 import javax.inject.Inject
 
 @HiltViewModel

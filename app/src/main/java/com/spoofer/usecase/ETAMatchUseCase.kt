@@ -1,7 +1,7 @@
 package com.spoofer.usecase
 
-import com.google.android.gms.maps.model.LatLng
 import com.spoofer.data.DirectionsRepository
+import org.maplibre.android.geometry.LatLng
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.abs

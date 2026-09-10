@@ -6,12 +6,12 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.google.android.gms.maps.model.LatLng
 import com.spoofer.ui.screen.HistoryScreen
 import com.spoofer.ui.screen.MapScreen
 import com.spoofer.ui.screen.SettingsScreen
 import com.spoofer.viewmodel.MapViewModel
 import com.spoofer.viewmodel.SpoofViewModel
+import org.maplibre.android.geometry.LatLng
 
 object Routes {
     const val MAP = "map"

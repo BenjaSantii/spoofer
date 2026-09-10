@@ -1,14 +1,7 @@
 package com.spoofer.ui.screen
 
-import android.Manifest
-import android.content.pm.PackageManager
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
@@ -49,34 +42,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.google.android.gms.maps.CameraUpdateFactory
-import com.google.android.gms.maps.model.BitmapDescriptorFactory
-import com.google.android.gms.maps.model.LatLng
-import com.google.android.gms.maps.model.MapStyleOptions
-import com.google.maps.android.compose.Circle
-import com.google.maps.android.compose.GoogleMap
-import com.google.maps.android.compose.MapProperties
-import com.google.maps.android.compose.MapUiSettings
-import com.google.maps.android.compose.Marker
-import com.google.maps.android.compose.Polyline
-import com.google.maps.android.compose.rememberCameraPositionState
-import com.google.maps.android.compose.rememberMarkerState
 import com.spoofer.model.SpoofMode
 import com.spoofer.ui.component.JoystickOverlay
 import com.spoofer.ui.component.LocationSearchBar
 import com.spoofer.ui.component.MockLocationSetupDialog
+import com.spoofer.ui.component.SpooferMap
 import com.spoofer.ui.component.StatusChip
 import com.spoofer.usecase.RoutePacing
 import com.spoofer.viewmodel.FavoritesViewModel
 import com.spoofer.viewmodel.MapViewModel
 import com.spoofer.viewmodel.SpoofViewModel
+import org.maplibre.android.geometry.LatLng
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -113,7 +93,6 @@ fun MapScreen(
 
     val favorites by favoriteViewModel.favorites.collectAsState()
 
-    val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     val scaffoldState = rememberBottomSheetScaffoldState()
 
@@ -123,24 +102,14 @@ fun MapScreen(
     var originText by remember { mutableStateOf("My Location") }
     var destText by remember { mutableStateOf("") }
     var routePointSelection by remember { mutableStateOf(RoutePointSelection.DESTINATION) }
+    var mapCameraTarget by remember { mutableStateOf<LatLng?>(null) }
+    var mapCameraRequestId by remember { mutableStateOf(0L) }
     val favoritesSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-
-    val cameraState = rememberCameraPositionState()
-    val originMarkerState = rememberMarkerState()
-    val targetMarkerState = rememberMarkerState()
 
     // Bug 12 fix: remember the last known mode so StatusChip has content during its
     // exit animation (spoofMode becomes null before the animation completes).
     var lastKnownSpoofMode by remember { mutableStateOf<SpoofMode?>(null) }
     LaunchedEffect(spoofMode) { if (spoofMode != null) lastKnownSpoofMode = spoofMode }
-
-    val infiniteTransition = rememberInfiniteTransition(label = "spoof_pulse")
-    val pulseRadius by infiniteTransition.animateFloat(
-        initialValue = 12f,
-        targetValue = 18f,
-        animationSpec = infiniteRepeatable(animation = tween(1000), repeatMode = RepeatMode.Reverse),
-        label = "pulse_radius",
-    )
 
     val isJoystickActive = isSpoofing && spoofMode == SpoofMode.JOYSTICK
     val isJoystickPreview = !isSpoofing && spoofMode == SpoofMode.JOYSTICK
@@ -194,18 +163,12 @@ fun MapScreen(
 
     LaunchedEffect(isSpoofing) {
         if (isSpoofing && currentSpoofedLocation != null) {
-            cameraState.animate(CameraUpdateFactory.newLatLngZoom(currentSpoofedLocation!!, 17f))
+            mapCameraTarget = currentSpoofedLocation
+            mapCameraRequestId++
         }
     }
 
-    LaunchedEffect(targetLatLng) {
-        // Bug 1 fix: removed startStaticSpoof() from here — it was restarting
-        // the service on every map tap while spoofing, causing location snaps.
-        // Static spoof only starts/updates from the explicit Start button press.
-        targetLatLng?.let { targetMarkerState.position = it }
-    }
     LaunchedEffect(originLatLng) {
-        originLatLng?.let { originMarkerState.position = it }
         // Bug 14 fix: sync the origin text field to real coordinates when the
         // GPS-derived origin loads, instead of showing the literal "My Location" string.
         if (originText == "My Location" && originLatLng != null) {
@@ -220,7 +183,10 @@ fun MapScreen(
         // Bug 2 fix: don't move the camera to the real GPS position while spoofing is
         // active — doing so fights the spoofed-location camera effect and causes a
         // brief rubber-band snap back to the real location.
-        if (!isSpoofing) cameraPosition?.let { cameraState.move(CameraUpdateFactory.newLatLngZoom(it, 16f)) }
+        if (!isSpoofing && cameraPosition != null) {
+            mapCameraTarget = cameraPosition
+            mapCameraRequestId++
+        }
     }
 
     LaunchedEffect(selectedMode, originLatLng, targetLatLng) {
@@ -233,7 +199,8 @@ fun MapScreen(
 
     LaunchedEffect(isJoystickActive, currentSpoofedLocation) {
         if (isJoystickActive && currentSpoofedLocation != null) {
-            cameraState.animate(CameraUpdateFactory.newLatLng(currentSpoofedLocation!!))
+            mapCameraTarget = currentSpoofedLocation
+            mapCameraRequestId++
         }
     }
     LaunchedEffect(isJoystickActive, joySpeedKmh) {
@@ -245,13 +212,6 @@ fun MapScreen(
             spoofViewModel.clearRoutePreview()
         }
     }
-
-    val fineLocationGranted =
-        ContextCompat.checkSelfPermission(
-            context, Manifest.permission.ACCESS_FINE_LOCATION,
-        ) == PackageManager.PERMISSION_GRANTED
-
-    val isDarkMap = MaterialTheme.colorScheme.background.luminance() < 0.5f
 
     BottomSheetScaffold(
         scaffoldState = scaffoldState,
@@ -271,13 +231,11 @@ fun MapScreen(
                 onDestTextChange = { destText = it },
                 onOriginSelected = { latLng ->
                     mapViewModel.setOrigin(latLng)
-                    originMarkerState.position = latLng
                     routePointSelection = RoutePointSelection.DESTINATION
                 },
                 onSwap = { mapViewModel.swapOriginAndDestination() },
                 onDestSelected = { latLng ->
                     mapViewModel.setTarget(latLng)
-                    targetMarkerState.position = latLng
                 },
                 onSearchPlace = { query -> mapViewModel.searchPlaces(query) },
                 speedKmh = speedKmh, onSpeedChange = { mapViewModel.setSpeedKmh(it) },
@@ -297,88 +255,34 @@ fun MapScreen(
         },
     ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize()) {
-            GoogleMap(
+            SpooferMap(
                 modifier = Modifier.fillMaxSize(),
-                cameraPositionState = cameraState,
-                properties =
-                    MapProperties(
-                        isMyLocationEnabled = fineLocationGranted && !isSpoofing,
-                        mapStyleOptions =
-                            if (isDarkMap) {
-                                MapStyleOptions.loadRawResourceStyle(
-                                    context,
-                                    com.spoofer.R.raw.map_style_dark,
-                                )
-                            } else {
-                                null
-                            },
-                    ),
-                uiSettings =
-                    MapUiSettings(
-                        zoomControlsEnabled = false,
-                        myLocationButtonEnabled = false,
-                        mapToolbarEnabled = false,
-                    ),
+                origin = originLatLng,
+                destination = targetLatLng,
+                route = routePreview,
+                spoofedLocation = currentSpoofedLocation,
+                cameraTarget = mapCameraTarget,
+                cameraRequestId = mapCameraRequestId,
+                routeColor = MaterialTheme.colorScheme.primary,
                 onMapClick = { latLng ->
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     if (selectedMode == SpoofMode.DIRECTIONS) {
                         when (routePointSelection) {
                             RoutePointSelection.ORIGIN -> {
                                 mapViewModel.setOrigin(latLng)
-                                originMarkerState.position = latLng
                                 routePointSelection = RoutePointSelection.DESTINATION
                             }
                             RoutePointSelection.DESTINATION -> {
                                 mapViewModel.setTarget(latLng)
-                                targetMarkerState.position = latLng
                             }
                         }
                     } else {
                         mapViewModel.setTarget(latLng)
-                        targetMarkerState.position = latLng
                     }
                 },
-            ) {
-                originLatLng?.let {
-                    Marker(
-                        state = originMarkerState,
-                        title = "Origin",
-                        onClick = {
-                            routePointSelection = RoutePointSelection.ORIGIN
-                            false
-                        },
-                        onInfoWindowClick = { routePointSelection = RoutePointSelection.ORIGIN },
-                        icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN),
-                    )
-                }
-                Marker(
-                    state = targetMarkerState,
-                    title = "Destination",
-                    onClick = {
-                        routePointSelection = RoutePointSelection.DESTINATION
-                        false
-                    },
-                    onInfoWindowClick = { routePointSelection = RoutePointSelection.DESTINATION },
-                    icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED),
-                )
-
-                if (routePreview.isNotEmpty()) {
-                    Polyline(
-                        points = routePreview,
-                        color = MaterialTheme.colorScheme.primary,
-                        width = 6f,
-                    )
-                }
-                currentSpoofedLocation?.let { loc ->
-                    Circle(
-                        center = loc,
-                        radius = pulseRadius.toDouble(),
-                        fillColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                        strokeColor = MaterialTheme.colorScheme.primary,
-                        strokeWidth = 2f,
-                    )
-                }
-            }
+                onOriginClick = { routePointSelection = RoutePointSelection.ORIGIN },
+                onDestinationClick = { routePointSelection = RoutePointSelection.DESTINATION },
+            )
 
             Column(
                 Modifier
@@ -389,8 +293,8 @@ fun MapScreen(
                 LocationSearchBar(
                     onLocationSelected = { latLng ->
                         mapViewModel.setTarget(latLng)
-                        targetMarkerState.position = latLng
-                        cameraState.move(CameraUpdateFactory.newLatLngZoom(latLng, 16f))
+                        mapCameraTarget = latLng
+                        mapCameraRequestId++
                     },
                     onFavoritesClick = { showFavoritesSheet = true },
                     onHistoryClick = onNavigateToHistory,
@@ -497,8 +401,8 @@ fun MapScreen(
             onSelect = { location ->
                 val ll = LatLng(location.latitude, location.longitude)
                 mapViewModel.setTarget(ll)
-                targetMarkerState.position = ll
-                cameraState.move(CameraUpdateFactory.newLatLngZoom(ll, 16f))
+                mapCameraTarget = ll
+                mapCameraRequestId++
                 showFavoritesSheet = false
             },
             onDelete = { favoriteViewModel.delete(it) },

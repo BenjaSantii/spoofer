@@ -1,6 +1,6 @@
 package com.spoofer.usecase
 
-import com.google.android.gms.maps.model.LatLng
+import org.maplibre.android.geometry.LatLng
 import javax.inject.Inject
 import kotlin.math.PI
 import kotlin.math.cos

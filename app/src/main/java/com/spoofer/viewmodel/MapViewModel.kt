@@ -2,7 +2,6 @@ package com.spoofer.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.google.android.gms.maps.model.LatLng
 import com.spoofer.location.RealLocationProvider
 import com.spoofer.model.SpeedMode
 import com.spoofer.model.SpoofMode
@@ -13,6 +12,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import org.maplibre.android.geometry.LatLng
 import javax.inject.Inject
 
 @HiltViewModel

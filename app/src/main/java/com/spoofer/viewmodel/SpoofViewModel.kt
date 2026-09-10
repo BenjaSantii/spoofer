@@ -4,7 +4,6 @@ import android.app.Application
 import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.google.android.gms.maps.model.LatLng
 import com.spoofer.data.DirectionsRepository
 import com.spoofer.data.RouteInfo
 import com.spoofer.location.MockLocationPermissionChecker
@@ -14,6 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import org.maplibre.android.geometry.LatLng
 import javax.inject.Inject
 
 @HiltViewModel

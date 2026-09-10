@@ -47,13 +47,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
-import com.google.android.gms.maps.model.LatLng
 import com.spoofer.data.RouteInfo
 import com.spoofer.model.SpeedMode
 import com.spoofer.model.SpoofMode
 import com.spoofer.model.TransportMode
 import com.spoofer.ui.component.LocationInputField
 import com.spoofer.ui.component.SpeedSlider
+import org.maplibre.android.geometry.LatLng
 import java.util.Locale
 import kotlin.math.roundToInt
 

@@ -19,15 +19,6 @@ android {
         versionName = "0.1.1-alpha"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-
-        val mapsApiKey =
-            providers.gradleProperty("MAPS_API_KEY")
-                .orElse(providers.environmentVariable("MAPS_API_KEY"))
-                .orElse("")
-                .get()
-
-        resValue("string", "maps_api_key", mapsApiKey)
-        buildConfigField("String", "MAPS_API_KEY", "\"$mapsApiKey\"")
     }
 
     val releaseStoreFile = providers.gradleProperty("SPOOFER_RELEASE_STORE_FILE").orNull
@@ -97,7 +88,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     debugImplementation("androidx.compose.ui:ui-tooling")
 
-    implementation("com.google.maps.android:maps-compose:6.1.2")
+    implementation("org.maplibre.gl:android-sdk-opengl:12.3.1")
     implementation("com.google.android.gms:play-services-location:21.3.0")
 
     implementation("com.google.dagger:hilt-android:2.51.1")

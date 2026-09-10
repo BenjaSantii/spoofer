@@ -125,18 +125,16 @@ Since this app interfaces with system-level Developer Options, installation requ
    ```
 2. **Open in Android Studio:**
    Allow Gradle to sync the dependencies.
-3. **Configure Google Maps:**
-   Supply an Android-restricted Google Maps API key without committing it:
-   ```bash
-   export MAPS_API_KEY=your_key
-   ```
-4. **Compile the APK:**
+3. **Compile the APK:**
    Click the **Run** button, or build via terminal:
    ```bash
    ./gradlew assembleDebug
    ```
-5. **Install to Device:**
+4. **Install to Device:**
    Ensure your device is connected via ADB and install the generated APK.
+
+The in-app map uses MapLibre Native with OpenFreeMap's OpenStreetMap-based public style. It does
+not require a Google Maps account, billing configuration, or an API key.
 
 ### Enabling Mock Locations (Crucial Step)
 The app will not work unless you grant it Mock Location authority at the OS level.

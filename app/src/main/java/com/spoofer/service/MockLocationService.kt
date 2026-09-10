@@ -10,7 +10,6 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
-import com.google.android.gms.maps.model.LatLng
 import com.spoofer.data.repository.HistoryRepository
 import com.spoofer.location.MockLocationProvider
 import com.spoofer.model.SpoofMode
@@ -28,6 +27,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import org.maplibre.android.geometry.LatLng
 import javax.inject.Inject
 import kotlin.random.Random
 
@@ -40,8 +40,6 @@ class MockLocationService : Service() {
     @Inject lateinit var speedSimulationUseCase: SpeedSimulationUseCase
 
     @Inject lateinit var historyRepo: HistoryRepository
-
-    @Inject lateinit var spoofLocationSource: com.spoofer.location.SpoofLocationSource
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var tickerJob: Job? = null
@@ -144,8 +142,6 @@ class MockLocationService : Service() {
         _remainingDistance.value = 0.0
         _currentHeading.value = 0f
 
-        spoofLocationSource.enterSpoofMode()
-
         startForegroundService()
 
         tickerJob?.cancel()
@@ -160,11 +156,10 @@ class MockLocationService : Service() {
                         SpoofMode.STATIC -> {
                             val jittered =
                                 staticSpoofUseCase.getJitteredLocation(
-                                    com.google.android.gms.maps.model.LatLng(staticLat, staticLng),
+                                    LatLng(staticLat, staticLng),
                                     jitterEnabled = false,
                                 )
                             mockLocationProvider.setMockLocation(jittered.latitude, jittered.longitude)
-                            spoofLocationSource.pushSpoofedLocation(jittered.latitude, jittered.longitude)
                             _currentLocation.value = jittered
                         }
                         SpoofMode.JOYSTICK -> {
@@ -186,7 +181,6 @@ class MockLocationService : Service() {
                                 bearing = joyAngle,
                                 speed = joySpeed,
                             )
-                            spoofLocationSource.pushSpoofedLocation(staticLat, staticLng, joyAngle, joySpeed)
                             _currentLocation.value = LatLng(staticLat, staticLng)
                         }
                         SpoofMode.DIRECTIONS -> {
@@ -210,7 +204,6 @@ class MockLocationService : Service() {
                                     bearing = result.bearing,
                                     speed = speedVariation,
                                 )
-                                spoofLocationSource.pushSpoofedLocation(jitterLat, jitterLng, result.bearing, speedVariation)
                                 _currentLocation.value = LatLng(jitterLat, jitterLng)
                                 // Bug 8 fix: keep staticLat/Lng tracking the un-jittered route
                                 // position so the notification and state don't drift off-route.
@@ -251,7 +244,6 @@ class MockLocationService : Service() {
         _totalDistanceTraveled.value = 0.0
         _remainingDistance.value = 0.0
         _currentHeading.value = 0f
-        spoofLocationSource.exitSpoofMode()
         mockLocationProvider.removeTestProvider()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()

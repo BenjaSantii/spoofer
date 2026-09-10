@@ -17,11 +17,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import com.google.android.gms.maps.model.LatLng
 import com.spoofer.data.PlaceSuggestion
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import org.maplibre.android.geometry.LatLng
 
 @Composable
 fun LocationInputField(

@@ -1,6 +1,5 @@
 package com.spoofer.data
 
-import com.google.android.gms.maps.model.LatLng
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import kotlinx.coroutines.Dispatchers
@@ -8,6 +7,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import org.maplibre.android.geometry.LatLng
 import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
